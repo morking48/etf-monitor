@@ -1,25 +1,20 @@
 """
-ETF三因子分析 Vercel Serverless Function
-替代 Python Flask 后端，部署到 Vercel 免费运行
-
-用法：
-1. 在 Vercel 部署此目录（https://vercel.com）
-2. 前端 api.js 中设置 API_BASE_URL = '你的Vercel域名'
-3. Vercel 自动识别 /api/ 目录为 Serverless Functions
+ETF三因子分析 Vercel Flask Backend
+同时提供 API 和静态文件服务
 """
-from http.server import BaseHTTPRequestHandler
+from flask import Flask, jsonify, send_from_directory
+from flask_cors import CORS
 import json
 import urllib.request
 import ssl
 import os
-import sys
 from datetime import datetime, timedelta
 
-# 增加路径以导入三因子脚本
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-TF_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, '..', '..', 'etf-three-factor-v7', 'scripts'))
-if TF_DIR not in sys.path:
-    sys.path.insert(0, TF_DIR)
+app = Flask(__name__)
+CORS(app)
+
+# 静态文件根目录（etf-app/）
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ssl_ctx = ssl.create_default_context()
 ssl_ctx.check_hostname = False
@@ -34,6 +29,24 @@ ETFS = {
     "510500": {"n": "华泰柏瑞中证500ETF",  "idx": "中证500"},
     "512100": {"n": "南方中证1000ETF",    "idx": "中证1000"},
 }
+
+
+# ============================================================
+# 静态文件路由
+# ============================================================
+
+@app.route('/')
+def serve_index():
+    return send_from_directory(BASE_DIR, 'index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    # API 请求不走这里（Flask 路由优先匹配更具体的）
+    full = os.path.join(BASE_DIR, path)
+    if os.path.isfile(full):
+        return send_from_directory(BASE_DIR, path)
+    # 前端路由 fallback（如 /detail/510300）
+    return send_from_directory(BASE_DIR, 'index.html')
 
 
 # ============================================================
@@ -75,7 +88,6 @@ def fetch_share_history(codes, target_date, lookback=5):
     sse_codes = [c for c in codes if c.startswith(('51', '56'))]
     szse_codes = [c for c in codes if c.startswith(('15', '16'))]
 
-    # 上交所逐日查询
     current = end_dt
     while current >= start_dt:
         ds = current.strftime('%Y%m%d')
@@ -97,7 +109,6 @@ def fetch_share_history(codes, target_date, lookback=5):
             pass
         current -= timedelta(days=1)
 
-    # 深交所批量查询
     if szse_codes:
         start_str = start_dt.strftime('%Y%m%d')
         end_str = end_dt.strftime('%Y%m%d')
@@ -107,7 +118,7 @@ def fetch_share_history(codes, target_date, lookback=5):
                 for _, row in df.iterrows():
                     code = str(row['基金代码'])
                     if code in szse_codes:
-                        d = str(row['日期'])[:10].replace('-', '') 
+                        d = str(row['日期'])[:10].replace('-', '')
                         d_fmt = f"{d[:4]}-{d[4:6]}-{d[6:8]}"
                         if code not in history:
                             history[code] = {}
@@ -115,7 +126,6 @@ def fetch_share_history(codes, target_date, lookback=5):
         except:
             pass
 
-    # 计算日份额变化率
     for code, dates in history.items():
         sorted_dates = sorted(dates.keys())
         for i, d in enumerate(sorted_dates):
@@ -135,7 +145,6 @@ def fetch_share_history(codes, target_date, lookback=5):
 # ============================================================
 
 def vprob(r):
-    """量能概率"""
     if r < 0.5: return max(0, r / 0.5 * 5)
     if r < 1.0: return 5 + (r - 0.5) / 0.5 * 12
     if r < 1.3: return 17 + (r - 1) / 0.3 * 18
@@ -147,14 +156,12 @@ def vprob(r):
 
 
 def dprob(etf_chg, t5, t5i, vr, idx_chg):
-    """方向概率"""
     discount = 1.0
     if idx_chg > 2.0: discount = 0.60
     elif idx_chg > 1.5: discount = 0.70
     elif idx_chg > 1.0: discount = 0.80
     elif idx_chg > 0.5: discount = 0.90
 
-    # f1: 当日行情特征 (40%)
     if etf_chg > 0.3 and t5i < -1: f1 = 95
     elif etf_chg > 0 and t5i < -0.5: f1 = 85
     elif etf_chg > 0 and t5i < 0: f1 = 70
@@ -169,7 +176,6 @@ def dprob(etf_chg, t5, t5i, vr, idx_chg):
     elif etf_chg < -0.5 and vr > 1.5: f1 = 15
     else: f1 = 25
 
-    # f2: 超额表现 (30%)
     gap = t5 - t5i
     if gap > 3: f2 = 95
     elif gap > 2: f2 = 85
@@ -180,7 +186,6 @@ def dprob(etf_chg, t5, t5i, vr, idx_chg):
     elif gap > -0.6: f2 = 30
     else: f2 = 15
 
-    # f3: 前期大盘走势 (20%)
     if t5i < -4: f3 = 95
     elif t5i < -3: f3 = 90
     elif t5i < -2: f3 = 80
@@ -191,12 +196,11 @@ def dprob(etf_chg, t5, t5i, vr, idx_chg):
     elif t5i < 3: f3 = 20
     else: f3 = 10
 
-    f4 = 35  # 尾盘行为 (10%)
+    f4 = 35
     return round((f1 * 0.4 + f2 * 0.3 + f3 * 0.2 + f4 * 0.1) * discount, 1)
 
 
 def sprob(share_delta_pct):
-    """份额概率"""
     if share_delta_pct > 10: return 95
     elif share_delta_pct > 5: return 80 + (share_delta_pct - 5) / 5 * 15
     elif share_delta_pct > 3: return 65 + (share_delta_pct - 3) / 2 * 15
@@ -208,20 +212,18 @@ def sprob(share_delta_pct):
 
 
 def align_idx(etf_data, idx_data):
-    """对齐ETF和指数K线日期"""
     idx_map = {d["date"]: i for i, d in enumerate(idx_data)}
     return [idx_map.get(d["date"]) for d in etf_data]
 
 
 def analyze_single(code, data, idx_d, days=35, share_data=None):
-    """分析单只ETF的三因子数据"""
     if len(data) < 22:
         return [], False
-    
+
     res = []
     aligned = align_idx(data, idx_d)
     three_factor_mode = False
-    
+
     for i in range(max(21, len(data) - days), len(data)):
         d = data[i]
         v = d["v"] / 10000
@@ -229,7 +231,7 @@ def analyze_single(code, data, idx_d, days=35, share_data=None):
         ma = sum(pv) / 20
         if ma == 0:
             continue
-        
+
         vr = v / ma
         pc = data[i - 1]["c"]
         chg = (d["c"] - pc) / pc * 100 if pc > 0 else 0
@@ -243,23 +245,22 @@ def analyze_single(code, data, idx_d, days=35, share_data=None):
                 j5 = aligned[i - 5]
                 if idx_d[j5]["c"] > 0:
                     t5i = round((idx_d[ii]["c"] - idx_d[j5]["c"]) / idx_d[j5]["c"] * 100, 2)
-        
+
         vp = round(vprob(vr), 1)
         dp = dprob(chg, t5, t5i, vr, idchg)
-        
-        # 份额因子
+
         sp = None; sd = None
         if share_data and code in share_data and d["date"] in share_data[code]:
             info = share_data[code][d["date"]]
             sd = info.get('delta_pct')
             sp = sprob(sd) if sd is not None else None
-        
+
         if sp is not None:
             cp = round(vp * 0.5 + dp * 0.2 + sp * 0.3, 1)
             three_factor_mode = True
         else:
             cp = round(vp * 0.7 + dp * 0.3, 1)
-        
+
         res.append({
             "d": d["date"], "c": d["c"], "chg": round(chg, 2),
             "t5": round(t5, 2), "t5i": t5i, "idx_chg": idchg,
@@ -268,132 +269,119 @@ def analyze_single(code, data, idx_d, days=35, share_data=None):
             "sp": round(sp, 1) if sp is not None else None, "sd": sd,
             "cp": cp, "signal": "HIGH" if cp >= 70 else ("MID" if cp >= 50 else "NORMAL"),
         })
-    
+
     return res, three_factor_mode
 
 
 # ============================================================
-# HTTP Handler (Vercel Python Runtime)
+# API 路由
 # ============================================================
 
-class handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        path = self.path.rstrip('/') or '/'
-        
-        if path == '/api/analysis':
-            return self.serve_analysis()
-        elif path == '/api/health':
-            return self.json_response({"status": "ok", "time": datetime.now().isoformat()})
-        elif path == '/api/etfs':
-            return self.json_response([{"code": c, "name": i["n"], "index": i["idx"]} for c, i in ETFS.items()])
-        elif path.startswith('/api/kline/'):
-            code = path.split('/')[-1]
-            return self.json_response(fetch_kline(code))
-        else:
-            return self.json_response({"error": "not found"}, 404)
-    
-    def serve_analysis(self):
-        """完整三因子分析"""
-        codes = list(ETFS.keys())
-        
-        # 1. K线数据
-        idx_data = fetch_kline("sh000300", 60)
-        first_kline = fetch_kline(codes[0], 60)
-        target_date = first_kline[-1]["date"] if first_kline else datetime.now().strftime('%Y-%m-%d')
-        
-        # 2. 份额数据（akshare，~18s）
-        share_data = fetch_share_history(codes, target_date, lookback=5)
-        share_available = len(share_data) > 0
-        
-        # 3. 三因子分析
-        results = []
-        any_three_factor = False
-        for code, info in ETFS.items():
-            kline = fetch_kline(code, 60)
-            if len(kline) < 22:
-                results.append({"code": code, "name": info["n"], "index": info["idx"],
-                    "error": f"数据不足({len(kline)}条)", "history": [], "latest": None})
-                continue
-            hist, tf = analyze_single(code, kline, idx_data, 35, share_data)
-            if tf: any_three_factor = True
+@app.route('/api/health')
+def health():
+    return jsonify({"status": "ok", "time": datetime.now().isoformat()})
+
+
+@app.route('/api/etfs')
+def get_etfs():
+    return jsonify([{"code": c, "name": i["n"], "index": i["idx"]} for c, i in ETFS.items()])
+
+
+@app.route('/api/kline/<code>')
+def get_kline(code):
+    data = fetch_kline(code)
+    return jsonify({"code": code, "count": len(data), "data": data})
+
+
+@app.route('/api/analysis')
+def get_analysis():
+    codes = list(ETFS.keys())
+
+    idx_data = fetch_kline("sh000300", 60)
+    first_kline = fetch_kline(codes[0], 60)
+    target_date = first_kline[-1]["date"] if first_kline else datetime.now().strftime('%Y-%m-%d')
+
+    share_data = fetch_share_history(codes, target_date, lookback=5)
+    share_available = len(share_data) > 0
+
+    results = []
+    any_three_factor = False
+    for code, info in ETFS.items():
+        kline = fetch_kline(code, 60)
+        if len(kline) < 22:
             results.append({"code": code, "name": info["n"], "index": info["idx"],
-                "history": hist, "latest": hist[-1] if hist else None})
-        
-        # 4. 汇总统计
-        high_count = sum(1 for r in results if r["latest"] and r["latest"]["cp"] >= 70)
-        mid_count = sum(1 for r in results if r["latest"] and 50 <= r["latest"]["cp"] < 70)
-        normal_count = sum(1 for r in results if r["latest"] and r["latest"]["cp"] < 50)
-        error_count = sum(1 for r in results if r["latest"] is None)
-        hs300_codes = ["510300", "510310", "510330", "159919"]
-        hs300_high = sum(1 for r in results if r["code"] in hs300_codes and r["latest"] and r["latest"]["cp"] >= 50)
-        
-        # 成交量排名
-        volume_ranking = []
-        for r in results:
-            if r["latest"]:
-                vr = r["latest"]["vr"]
-                label = "极端放量" if vr >= 2.0 else ("显著放量" if vr >= 1.5 else ("温和放量" if vr >= 1.0 else "正常"))
-                volume_ranking.append({
-                    "code": r["code"], "name": r["name"], "index": r["index"],
-                    "vr": vr, "v": r["latest"]["v"], "vma": r["latest"]["vma"],
-                    "chg": r["latest"]["chg"], "cp": r["latest"]["cp"], "label": label
-                })
-        volume_ranking.sort(key=lambda x: x["vr"], reverse=True)
-        
-        # 方向一致性
-        up_count = sum(1 for r in results if r["latest"] and r["latest"]["chg"] > 0)
-        down_count = sum(1 for r in results if r["latest"] and r["latest"]["chg"] < 0)
-        if up_count >= len(results) * 0.75: direction = "强一致看多"
-        elif down_count >= len(results) * 0.75: direction = "强一致看空"
-        elif up_count > down_count: direction = "偏多"
-        elif down_count > up_count: direction = "偏空"
-        else: direction = "分歧"
-        
-        # 综合评级
-        valid_cps = [r["latest"]["cp"] for r in results if r["latest"]]
-        avg_cp = round(sum(valid_cps) / len(valid_cps), 1) if valid_cps else 0
-        if avg_cp >= 70: rating = "🔴 高确信 — 国家队大概率正在积极增持宽基ETF"
-        elif avg_cp >= 50: rating = "🟡 中等确信 — 值得关注，等待更多确认信号"
-        elif avg_cp >= 30: rating = "🟠 低确信 — 异常放量但无法归因于国家队"
-        else: rating = "⚪ 无信号 — 正常交易，未检测到国家队操作痕迹"
-        
-        # 信号回溯
-        date_sig = {}
-        for r in results:
-            for h in r["history"]:
-                d = h["d"]
-                if d not in date_sig: date_sig[d] = {"total": 0, "high": 0, "mid": 0, "codes": []}
-                date_sig[d]["total"] += 1
-                if h["cp"] >= 70: 
-                    date_sig[d]["high"] += 1
-                    date_sig[d]["codes"].append(f"{r['code']}({h['cp']:.0f}%)")
-                elif h["cp"] >= 50: date_sig[d]["mid"] += 1
-        signal_backtrack = []
-        for d, v in date_sig.items():
-            if v["high"] >= 2 or v["high"] + v["mid"] >= 4:
-                signal_backtrack.append({"date": d, "high": v["high"], "mid": v["mid"], "codes": v["codes"][:5]})
-        signal_backtrack.sort(key=lambda x: x["date"], reverse=True)
-        
-        return self.json_response({
-            "time": datetime.now().isoformat(),
-            "target_date": target_date,
-            "mode": "three_factor" if any_three_factor else "two_factor",
-            "share_available": share_available,
-            "summary": {"high": high_count, "mid": mid_count, "normal": normal_count, "error": error_count, "hs300_alert": hs300_high},
-            "report": {"rating": rating, "avg_cp": avg_cp, "volume_ranking": volume_ranking,
-                "direction": {"up": up_count, "down": down_count, "consensus": direction},
-                "signal_backtrack": signal_backtrack[:10]},
-            "etfs": results
-        })
-    
-    def json_response(self, data, status=200):
-        body = json.dumps(data, ensure_ascii=False).encode('utf-8')
-        self.send_response(status)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-    
-    def log_message(self, format, *args):
-        pass  # 抑制 Vercel 日志噪声
+                "error": f"数据不足({len(kline)}条)", "history": [], "latest": None})
+            continue
+        hist, tf = analyze_single(code, kline, idx_data, 35, share_data)
+        if tf: any_three_factor = True
+        results.append({"code": code, "name": info["n"], "index": info["idx"],
+            "history": hist, "latest": hist[-1] if hist else None})
+
+    high_count = sum(1 for r in results if r["latest"] and r["latest"]["cp"] >= 70)
+    mid_count = sum(1 for r in results if r["latest"] and 50 <= r["latest"]["cp"] < 70)
+    normal_count = sum(1 for r in results if r["latest"] and r["latest"]["cp"] < 50)
+    error_count = sum(1 for r in results if r["latest"] is None)
+    hs300_codes = ["510300", "510310", "510330", "159919"]
+    hs300_high = sum(1 for r in results if r["code"] in hs300_codes and r["latest"] and r["latest"]["cp"] >= 50)
+
+    volume_ranking = []
+    for r in results:
+        if r["latest"]:
+            vr = r["latest"]["vr"]
+            label = "极端放量" if vr >= 2.0 else ("显著放量" if vr >= 1.5 else ("温和放量" if vr >= 1.0 else "正常"))
+            volume_ranking.append({
+                "code": r["code"], "name": r["name"], "index": r["index"],
+                "vr": vr, "v": r["latest"]["v"], "vma": r["latest"]["vma"],
+                "chg": r["latest"]["chg"], "cp": r["latest"]["cp"], "label": label
+            })
+    volume_ranking.sort(key=lambda x: x["vr"], reverse=True)
+
+    up_count = sum(1 for r in results if r["latest"] and r["latest"]["chg"] > 0)
+    down_count = sum(1 for r in results if r["latest"] and r["latest"]["chg"] < 0)
+    if up_count >= len(results) * 0.75: direction = "强一致看多"
+    elif down_count >= len(results) * 0.75: direction = "强一致看空"
+    elif up_count > down_count: direction = "偏多"
+    elif down_count > up_count: direction = "偏空"
+    else: direction = "分歧"
+
+    valid_cps = [r["latest"]["cp"] for r in results if r["latest"]]
+    avg_cp = round(sum(valid_cps) / len(valid_cps), 1) if valid_cps else 0
+    if avg_cp >= 70: rating = "🔴 高确信 — 国家队大概率正在积极增持宽基ETF"
+    elif avg_cp >= 50: rating = "🟡 中等确信 — 值得关注，等待更多确认信号"
+    elif avg_cp >= 30: rating = "🟠 低确信 — 异常放量但无法归因于国家队"
+    else: rating = "⚪ 无信号 — 正常交易，未检测到国家队操作痕迹"
+
+    date_sig = {}
+    for r in results:
+        for h in r["history"]:
+            d = h["d"]
+            if d not in date_sig: date_sig[d] = {"total": 0, "high": 0, "mid": 0, "codes": []}
+            date_sig[d]["total"] += 1
+            if h["cp"] >= 70:
+                date_sig[d]["high"] += 1
+                date_sig[d]["codes"].append(f"{r['code']}({h['cp']:.0f}%)")
+            elif h["cp"] >= 50: date_sig[d]["mid"] += 1
+    signal_backtrack = []
+    for d, v in date_sig.items():
+        if v["high"] >= 2 or v["high"] + v["mid"] >= 4:
+            signal_backtrack.append({"date": d, "high": v["high"], "mid": v["mid"], "codes": v["codes"][:5]})
+    signal_backtrack.sort(key=lambda x: x["date"], reverse=True)
+
+    return jsonify({
+        "time": datetime.now().isoformat(),
+        "target_date": target_date,
+        "mode": "three_factor" if any_three_factor else "two_factor",
+        "share_available": share_available,
+        "summary": {"high": high_count, "mid": mid_count, "normal": normal_count, "error": error_count, "hs300_alert": hs300_high},
+        "report": {"rating": rating, "avg_cp": avg_cp, "volume_ranking": volume_ranking,
+            "direction": {"up": up_count, "down": down_count, "consensus": direction},
+            "signal_backtrack": signal_backtrack[:10]},
+        "etfs": results
+    })
+
+
+# ============================================================
+# Vercel 入口（Flask preset 需要 app 变量）
+# ============================================================
+if __name__ == '__main__':
+    app.run(debug=True)
