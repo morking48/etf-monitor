@@ -1,0 +1,7 @@
+# Vercel Python Runtime 依赖
+# pip install -r requirements.txt (本地测试用)
+# Vercel 部署时自动识别此文件
+
+akshare==1.17.0
+Flask==3.1.1
+flask-cors==5.0.1
