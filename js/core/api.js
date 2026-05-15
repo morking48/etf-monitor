@@ -24,6 +24,7 @@ async function doRefresh() {
         const data = await resp.json();
         
         appData = data;
+        window.appData = data;
         
         // 触发 Web 版 UI 刷新
         if (typeof renderSummaryCards === 'function') renderSummaryCards(data.summary);
