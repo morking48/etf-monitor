@@ -38,6 +38,10 @@ function initHistory(data) {
 function renderHistory() {
     if (!historyData || !historyDateList.length) {
         document.getElementById('historyDate').textContent = '--';
+        const container = document.getElementById('historyDetailList');
+        if (container) {
+            container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:12px">📊</div><div style="font-size:15px;font-weight:600;margin-bottom:8px">暂无历史数据</div><div style="font-size:13px">请点击上方「🔄 刷新数据」按钮加载数据</div></div>';
+        }
         return;
     }
     
