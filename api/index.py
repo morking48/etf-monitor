@@ -252,7 +252,7 @@ def analyze_single(code, data, idx_d, days=35, share_data=None):
         if share_data and code in share_data and d["date"] in share_data[code]:
             info = share_data[code][d["date"]]
             sd = info.get('delta_pct')
-            sp = sprob(sd)
+            sp = sprob(sd) if sd is not None else None
         
         if sp is not None:
             cp = round(vp * 0.5 + dp * 0.2 + sp * 0.3, 1)
