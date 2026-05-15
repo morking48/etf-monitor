@@ -9,7 +9,7 @@
 // 例如: 'https://etf-monitor.vercel.app'
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:5000'  // 本地开发：直连 Flask 后端
-    : 'https://etf-monitor-fblu.vercel.app';  // 生产环境：Vercel 后端
+    : 'https://etf-monitor-alpha.vercel.app';  // 生产环境：Vercel 后端
 
 // ========== 主刷新入口 ==========
 async function doRefresh() {
