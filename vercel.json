@@ -1,13 +1,8 @@
 {
-  "functions": {
-    "api/index.py": {
-      "memory": 256,
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" },
     { "source": "/api/analysis", "destination": "/api/index" },
-    { "source": "/api/health", "destination": "/api/index" }
+    { "source": "/api/health", "destination": "/api/index" },
+    { "source": "/api/etfs", "destination": "/api/index" },
+    { "source": "/api/kline/(.*)", "destination": "/api/index" }
   ]
 }
