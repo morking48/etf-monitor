@@ -1,8 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/analysis", "destination": "/api/index" },
-    { "source": "/api/health", "destination": "/api/index" },
-    { "source": "/api/etfs", "destination": "/api/index" },
-    { "source": "/api/kline/(.*)", "destination": "/api/index" }
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
