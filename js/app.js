@@ -44,6 +44,9 @@ function initTabNav() {
                 }, 200);
             }
             if (tab === 'history') {
+                if (appData && (!historyDateList || !historyDateList.length)) {
+                    initHistory(appData);
+                }
                 setTimeout(() => { if (typeof heatmapChart !== 'undefined' && heatmapChart) heatmapChart.resize(); }, 200);
             }
             if (tab === 'simulator') {
