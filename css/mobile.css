@@ -312,3 +312,107 @@ body.offline .offline-bar{display:block}
 }
 .table-scroll::-webkit-scrollbar{height:3px}
 .table-scroll::-webkit-scrollbar-thumb{background:rgba(100,116,139,0.3);border-radius:3px}
+
+/* ============================================================
+   强制覆盖桌面端 Grid 布局 — 解决竖屏挤压问题
+   ============================================================ */
+
+/* 1. 仪表盘 ETF 卡片：强制单列 */
+.dashboard-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+}
+
+/* 2. 模拟盘资产总览：强制2列，总资产独占一行 */
+.sim-overview {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+}
+.sim-overview-card.sim-ov-main {
+    grid-column: 1 / -1 !important; /* 独占整行 */
+}
+.sim-ov-value {
+    font-size: 18px !important;
+    word-break: break-all;
+}
+
+/* 3. 历史页信号卡片：强制2列 */
+.history-detail-list {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+}
+
+/* 4. 详情页三因子仪表盘：改为上下堆叠 */
+.gauge-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+}
+.chart-gauge {
+    height: 200px !important;
+    width: 100% !important;
+}
+
+/* 5. ETF 卡片内部文字防溢出 */
+.etf-card .card-name {
+    font-size: 13px !important;
+    word-break: keep-all;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.etf-card .card-prob-value {
+    font-size: 28px !important;
+}
+.etf-card .card-factors {
+    font-size: 10px !important;
+}
+
+/* 6. 模拟盘操作按钮换行 */
+.sim-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    justify-content: flex-start !important;
+}
+.btn-sim {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+}
+
+/* 7. 综合报告表格横向滚动 */
+.report-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+/* 8. 配置弹窗适配窄屏 */
+.config-panel {
+    width: 90vw !important;
+    max-width: 400px !important;
+    padding: 16px !important;
+}
+
+/* 9. 详情页头部信息换行 */
+.detail-header {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+}
+.detail-name {
+    font-size: 14px !important;
+}
+
+/* 10. 历史页头部信息换行 */
+.history-header {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+}
+.history-summary {
+    width: 100%;
+    margin-left: 0 !important;
+    margin-top: 4px;
+}
+
+
