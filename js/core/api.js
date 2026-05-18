@@ -19,7 +19,7 @@ async function doRefresh() {
     if (info) info.textContent = '⏳ 获取数据中...（含份额因子约需18秒）';
 
     try {
-        const resp = await fetch(API_BASE_URL + '/api/analysis');
+        const resp = await fetch(API_BASE_URL + '/api/analysis?days=200');
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         
@@ -39,7 +39,7 @@ async function doRefresh() {
         const dateEl = document.getElementById('headerDate');
         if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
         if (dateEl) dateEl.textContent = data.target_date;
-        if (info) info.textContent = `✅ ${data.mode === 'three_factor' ? '三因子' : '二因子'}模式 | ${data.target_date}`;
+        if (info) info.textContent = `✅ ${data.mode === 'three_factor' ? '三因子' : '二因子'}模式 | ${data.target_date} | 回溯${data.days || 35}天`;
         
         // 更新模式标签
         const modeEl = document.getElementById('headerModelMode');

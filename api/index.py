@@ -295,10 +295,18 @@ def get_kline(code):
 
 @app.route('/api/analysis')
 def get_analysis():
+    from flask import request
     codes = list(ETFS.keys())
+    
+    # 支持前端传入 days 参数，默认 35，最大 200
+    days = request.args.get('days', 35, type=int)
+    days = max(1, min(days, 200))  # 限制 1-200 天
+    
+    # 根据请求天数动态计算 K 线 limit（留足 20 日 MA + 余量）
+    kline_limit = max(60, days + 30)
 
-    idx_data = fetch_kline("sh000300", 60)
-    first_kline = fetch_kline(codes[0], 60)
+    idx_data = fetch_kline("sh000300", kline_limit)
+    first_kline = fetch_kline(codes[0], kline_limit)
     target_date = first_kline[-1]["date"] if first_kline else datetime.now().strftime('%Y-%m-%d')
 
     share_data = fetch_share_history(codes, target_date, lookback=5)
@@ -307,12 +315,12 @@ def get_analysis():
     results = []
     any_three_factor = False
     for code, info in ETFS.items():
-        kline = fetch_kline(code, 60)
+        kline = fetch_kline(code, kline_limit)
         if len(kline) < 22:
             results.append({"code": code, "name": info["n"], "index": info["idx"],
                 "error": f"数据不足({len(kline)}条)", "history": [], "latest": None})
             continue
-        hist, tf = analyze_single(code, kline, idx_data, 35, share_data)
+        hist, tf = analyze_single(code, kline, idx_data, days, share_data)
         if tf: any_three_factor = True
         results.append({"code": code, "name": info["n"], "index": info["idx"],
             "history": hist, "latest": hist[-1] if hist else None})
@@ -370,6 +378,7 @@ def get_analysis():
     return jsonify({
         "time": datetime.now().isoformat(),
         "target_date": target_date,
+        "days": days,
         "mode": "three_factor" if any_three_factor else "two_factor",
         "share_available": share_available,
         "summary": {"high": high_count, "mid": mid_count, "normal": normal_count, "error": error_count, "hs300_alert": hs300_high},
