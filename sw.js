@@ -2,8 +2,8 @@
 // 配合 Vercel 后端使用
 // 职责：静态资源缓存 + 腾讯K线API缓存 + 离线容错
 
-const CACHE_NAME = 'etf-pwa-v3';
-const API_CACHE = 'etf-api-v3';
+const CACHE_NAME = 'etf-pwa-v4';
+const API_CACHE = 'etf-api-v4';
 
 // 预缓存静态资源
 const STATIC_ASSETS = [
