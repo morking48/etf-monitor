@@ -4,6 +4,7 @@
  */
 let appData = null;
 let isRefreshing = false;
+let lastRefreshMinute = -1;
 
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🛡️ ETF三因子 PWA 启动...');
@@ -23,6 +24,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // 自动首次刷新
     setTimeout(doRefresh, 500);
+    
+    // 开启定时自动刷新
+    initAutoRefresh();
 });
 
 // ========== Tab 路由 ==========
@@ -54,6 +58,34 @@ function initTabNav() {
             }
         });
     });
+}
+
+// ========== 自动刷新 ==========
+function initAutoRefresh() {
+    setInterval(() => {
+        const now = new Date();
+        const day = now.getDay();
+        
+        // 过滤周末
+        if (day === 0 || day === 6) return;
+
+        const h = now.getHours();
+        const m = now.getMinutes();
+
+        // 指定刷新时间：09:30, 10:00, 10:30, 11:00, 11:30, 13:00, 13:30, 14:00, 14:30, 15:00, 15:30, 16:00
+        const targetTimes = [
+            [9, 30], [10, 0], [10, 30], [11, 0], [11, 30],
+            [13, 0], [13, 30], [14, 0], [14, 30], [15, 0], [15, 30], [16, 0]
+        ];
+
+        const isTarget = targetTimes.some(t => t[0] === h && t[1] === m);
+
+        if (isTarget && lastRefreshMinute !== m) {
+            lastRefreshMinute = m;
+            console.log(`[自动刷新] 触发时间: ${h}:${m.toString().padStart(2, '0')}`);
+            if (typeof doRefresh === 'function') doRefresh();
+        }
+    }, 10000); // 每10秒检测一次
 }
 
 // ========== 暴露给 api.js 的回调 (Web 版 UI 对接) ==========
