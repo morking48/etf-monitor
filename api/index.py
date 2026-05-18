@@ -21,13 +21,13 @@ ssl_ctx.check_hostname = False
 ssl_ctx.verify_mode = ssl.CERT_NONE
 
 ETFS = {
-    "510300": {"n": "华泰柏瑞沪深300ETF", "idx": "沪深300"},
-    "510310": {"n": "易方达沪深300ETF",   "idx": "沪深300"},
-    "510330": {"n": "华夏沪深300ETF",     "idx": "沪深300"},
-    "159919": {"n": "嘉实沪深300ETF",     "idx": "沪深300"},
-    "510050": {"n": "华夏上证50ETF",      "idx": "上证50"},
-    "510500": {"n": "华泰柏瑞中证500ETF",  "idx": "中证500"},
-    "512100": {"n": "南方中证1000ETF",    "idx": "中证1000"},
+    "510300": {"n": "华泰柏瑞沪深300ETF", "idx": "沪深300", "mkt": "SH"},
+    "510310": {"n": "易方达沪深300ETF",   "idx": "沪深300", "mkt": "SH"},
+    "510330": {"n": "华夏沪深300ETF",     "idx": "沪深300", "mkt": "SH"},
+    "159919": {"n": "嘉实沪深300ETF",     "idx": "沪深300", "mkt": "SZ"},
+    "510050": {"n": "华夏上证50ETF",      "idx": "上证50",  "mkt": "SH"},
+    "510500": {"n": "南方中证500ETF",     "idx": "中证500", "mkt": "SH"},
+    "512100": {"n": "南方中证1000ETF",    "idx": "中证1000", "mkt": "SH"},
 }
 
 
@@ -322,7 +322,7 @@ def get_analysis():
             continue
         hist, tf = analyze_single(code, kline, idx_data, days, share_data)
         if tf: any_three_factor = True
-        results.append({"code": code, "name": info["n"], "index": info["idx"],
+        results.append({"code": code, "name": info["n"], "index": info["idx"], "mkt": info.get("mkt", "SH"),
             "history": hist, "latest": hist[-1] if hist else None})
 
     high_count = sum(1 for r in results if r["latest"] and r["latest"]["cp"] >= 70)
