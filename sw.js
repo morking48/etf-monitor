@@ -52,6 +52,11 @@ self.addEventListener('activate', (event) => {
 
 // ========== 请求拦截 ==========
 self.addEventListener('fetch', (event) => {
+    // 忽略非 HTTP/HTTPS 请求（例如 chrome-extension://）
+    if (!event.request.url.startsWith('http')) {
+        return;
+    }
+
     const url = new URL(event.request.url);
 
     // 腾讯 K 线 API：缓存 4 小时（swr 策略）
@@ -72,9 +77,9 @@ async function cacheFirstThenNetwork(request, cacheName) {
     if (cached) return cached;
     try {
         const resp = await fetch(request);
-        if (resp && resp.status === 200) {
+        if (resp && resp.status === 200 && request.url.startsWith('http')) {
             const clone = resp.clone();
-            caches.open(cacheName).then(cache => cache.put(request, clone));
+            caches.open(cacheName).then(cache => cache.put(request, clone)).catch(err => console.warn('Cache put failed:', err));
         }
         return resp;
     } catch (e) {
@@ -87,9 +92,9 @@ async function staleWhileRevalidate(request, cacheName, maxAgeSec = 3600) {
     
     // 后台更新
     const fetchPromise = fetch(request).then(resp => {
-        if (resp && resp.status === 200) {
+        if (resp && resp.status === 200 && request.url.startsWith('http')) {
             const clone = resp.clone();
-            caches.open(cacheName).then(cache => cache.put(request, clone));
+            caches.open(cacheName).then(cache => cache.put(request, clone)).catch(err => console.warn('Cache put failed:', err));
         }
         return resp;
     }).catch(() => cached);
